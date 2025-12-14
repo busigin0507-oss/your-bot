@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📥 YouTube & Pinterest Downloader Bot</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 32px;
+        }
+        .emoji {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        .status {
+            background: #f0f9ff;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 25px 0;
+            border-left: 5px solid #0088cc;
+        }
+        .status h3 {
+            color: #0088cc;
+            margin-bottom: 10px;
+        }
+        .telegram-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 15px 30px;
+            background: #0088cc;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 18px;
+            transition: transform 0.3s;
+        }
+        .telegram-link:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0, 136, 204, 0.4);
+        }
+        .instructions {
+            margin-top: 30px;
+            text-align: left;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+        }
+        .instructions h4 {
+            color: #555;
+            margin-bottom: 10px;
+        }
+        code {
+            background: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="emoji">🤖</div>
+        <h1>YouTube & Pinterest Downloader Bot</h1>
+        
+        <p style="color: #666; font-size: 18px; margin-bottom: 30px;">
+            Telegram бот для скачивания видео и изображений
+        </p>
+        
+        <div class="status">
+            <h3>✅ Статус: Активен</h3>
+            <p>Бэкенд бота работает на Vercel Python</p>
+            <p style="margin-top: 10px; font-size: 14px; color: #555;">
+                Время работы: 24/7 • Обновление: автоматическое
+            </p>
+        </div>
+        
+        <a href="https://t.me/ваш_бот" class="telegram-link" target="_blank">
+            📲 Открыть в Telegram
+        </a>
+        
+        <div class="instructions">
+            <h4>📋 Как использовать:</h4>
+            <ol style="margin-left: 20px; color: #555;">
+                <li>Нажмите кнопку выше для перехода в Telegram</li>
+                <li>Отправьте боту команду <code>/start</code></li>
+                <li>Отправьте ссылку на YouTube или Pinterest</li>
+                <li>Получите скачанное медиа</li>
+            </ol>
+            
+            <h4 style="margin-top: 20px;">🔧 Техническая информация:</h4>
+            <ul style="margin-left: 20px; color: #555;">
+                <li><strong>Хостинг:</strong> Vercel Serverless Functions</li>
+                <li><strong>Язык:</strong> Python 3.12</li>
+                <li><strong>Основные библиотеки:</strong> Flask, python-telegram-bot</li>
+                <li><strong>Авто-деплой:</strong> из GitHub репозитория</li>
+            </ul>
+        </div>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #888; font-size: 14px;">
+            <p>© 2024 • Автоматический бот для скачивания медиа</p>
+            <p style="margin-top: 5px;">
+                GitHub: <a href="https://github.com/busigin0507-oss/your-bot" style="color: #667eea;">busigin0507-oss/your-bot</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
