@@ -12,8 +12,12 @@
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/",
       "dest": "/api/telegram.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/index.html"
     }
   ]
 }
