@@ -6,6 +6,14 @@
     }
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/telegram.py" }
-  ]
+    { 
+      "source": "/api/(.*)", 
+      "destination": "/api/telegram.py" 
+    },
+    { 
+      "source": "/(.*)", 
+      "destination": "/public/index.html" 
+    }
+  ],
+  "outputDirectory": "public"
 }
