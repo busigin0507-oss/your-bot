@@ -1,196 +1,128 @@
 """
-ТЕЛЕГРАМ БОТ ДЛЯ VERCEL SERVERLESS
-Версия 3.0 - оптимизирована для Vercel
+TELEGRAM BOT FOR VERCEL - WORKING VERSION
+Токен встроен в код: 8273781946:AAFsvhsMR8WtS4SzQEd22ofCx1X0kV7f7ZA
 """
 
 from flask import Flask, request, jsonify
-import os
-import logging
-import re
-import random
 import requests
-import yt_dlp
-import tempfile
-from urllib.parse import urlparse
+import re
+import logging
 
 # =========================================================================
-# НАСТРОЙКА ПРИЛОЖЕНИЯ
+# КОНФИГУРАЦИЯ
 # =========================================================================
 
 app = Flask(__name__)
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# ВАШ ТОКЕН В КОДЕ
+BOT_TOKEN = "8273781946:AAFsvhsMR8WtS4SzQEd22ofCx1X0kV7f7ZA"
+TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
+# Логирование
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Токен бота из переменных окружения Vercel
-BOT_TOKEN = os.getenv('BOT_TOKEN', '8273781946:AAGuV4znNtNEHgCeDhRrCDQyPJKynzca2EQ')
-TELEGRAM_API = f'https://api.telegram.org/bot{BOT_TOKEN}'
-
 # =========================================================================
-# ФУНКЦИИ ДЛЯ СКАЧИВАНИЯ (встроены в один файл для Vercel)
+# ПРОСТЫЕ ФУНКЦИИ ДЛЯ VERCEL
 # =========================================================================
 
-def extract_youtube_id(url):
-    """Извлечение ID видео из YouTube ссылки"""
-    patterns = [
-        r'youtu\.be/([^&\n?#]+)',
-        r'youtube\.com/watch\?.*v=([^&\n?#]+)',
-        r'youtube\.com/embed/([^&\n?#]+)',
-        r'youtube\.com/shorts/([^&\n?#]+)'
-    ]
-    
-    for pattern in patterns:
-        match = re.search(pattern, url, re.IGNORECASE)
-        if match:
-            video_id = match.group(1).split('?')[0].split('&')[0]
-            return video_id
-    
-    return None
-
-def download_youtube_video(url, quality='720p'):
-    """Скачивание видео с YouTube (упрощенная версия для Vercel)"""
+def get_youtube_direct_link(url):
+    """Получаем прямую ссылку на YouTube видео через yt-dlp"""
     try:
-        video_id = extract_youtube_id(url)
-        if not video_id:
-            return {'success': False, 'error': 'Неверная ссылка YouTube', 'type': 'youtube'}
+        import yt_dlp
         
-        logger.info(f"Обработка YouTube: {video_id}")
-        
-        # Упрощенные настройки для Vercel
         ydl_opts = {
-            'format': 'best[height<=720]',
+            'format': 'best[filesize<50M]',  # До 50MB для Vercel
             'quiet': True,
             'no_warnings': True,
-            'extract_flat': True,
-            'max_filesize': 50 * 1024 * 1024,  # 50MB максимум для Vercel
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             
-            if not info:
-                return {'success': False, 'error': 'Не удалось получить информацию', 'type': 'youtube'}
-            
-            title = info.get('title', 'YouTube Video')
-            duration = info.get('duration', 0)
-            
-            # Проверка длительности
-            if duration > 300:  # 5 минут максимум для Vercel
-                return {
-                    'success': False,
-                    'error': 'Видео слишком длинное (>5 мин) для Vercel',
-                    'type': 'youtube'
-                }
-            
-            # Получаем лучшую доступную ссылку
-            formats = info.get('formats', [{}])
-            best_format = formats[-1]  # Последний формат обычно лучший
-            
-            video_url = best_format.get('url')
-            if not video_url:
-                # Пробуем получить URL из info
-                video_url = info.get('url')
-            
-            if video_url:
+            if 'url' in info:
                 return {
                     'success': True,
-                    'url': video_url,
-                    'title': title,
-                    'video_id': video_id,
-                    'duration': duration,
-                    'quality': quality,
-                    'type': 'youtube'
+                    'url': info['url'],
+                    'title': info.get('title', 'YouTube Video'),
+                    'duration': info.get('duration', 0)
                 }
             
-            return {'success': False, 'error': 'Не удалось получить ссылку', 'type': 'youtube'}
-    
+            # Ищем в форматах
+            formats = info.get('formats', [])
+            if formats:
+                return {
+                    'success': True,
+                    'url': formats[-1]['url'],
+                    'title': info.get('title', 'YouTube Video'),
+                    'duration': info.get('duration', 0)
+                }
+                
     except Exception as e:
         logger.error(f"YouTube error: {e}")
-        return {'success': False, 'error': str(e), 'type': 'youtube'}
+    
+    return {'success': False, 'error': 'Не удалось получить видео'}
 
-def download_pinterest_media(url):
-    """Скачивание медиа с Pinterest (упрощенная версия)"""
+def get_pinterest_media(url):
+    """Получаем медиа с Pinterest"""
     try:
-        logger.info(f"Обработка Pinterest: {url}")
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=5)
         
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        if response.status_code != 200:
-            return {'success': False, 'error': f'Ошибка {response.status_code}', 'type': 'pinterest'}
-        
+        # Ищем изображение
         html = response.text
+        img_match = re.search(r'src="(https://i\.pinimg\.com/[^"]+)"', html)
         
-        # Простой поиск медиа
-        patterns = [
-            r'"url":"(https://i\.pinimg\.com/[^"]+)"',
-            r'src="(https://i\.pinimg\.com/[^"]+)"',
-            r'content="(https://i\.pinimg\.com/[^"]+)"'
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, html)
-            if match:
-                media_url = match.group(1).replace('\\/', '/')
-                return {
-                    'success': True,
-                    'url': media_url,
-                    'title': 'Pinterest Media',
-                    'type': 'image',
-                    'source': 'pinterest'
-                }
-        
-        return {'success': False, 'error': 'Медиа не найдено', 'type': 'pinterest'}
+        if img_match:
+            return {
+                'success': True,
+                'url': img_match.group(1),
+                'title': 'Pinterest Image',
+                'type': 'image'
+            }
     
     except Exception as e:
         logger.error(f"Pinterest error: {e}")
-        return {'success': False, 'error': str(e), 'type': 'pinterest'}
+    
+    return {'success': False, 'error': 'Не удалось найти изображение'}
 
 # =========================================================================
-# TELEGRAM API ФУНКЦИИ
+# TELEGRAM ФУНКЦИИ
 # =========================================================================
 
-def call_telegram_api(method, data):
-    """Вызов API Telegram"""
-    url = f'{TELEGRAM_API}/{method}'
+def telegram_api(method, data):
+    """Отправка запроса к Telegram API"""
     try:
-        response = requests.post(url, json=data, timeout=10)
-        return response.json()
-    except Exception as e:
-        logger.error(f"Telegram API Error: {e}")
+        url = f"{TELEGRAM_API}/{method}"
+        resp = requests.post(url, json=data, timeout=10)
+        return resp.json()
+    except:
         return {'ok': False}
 
-def send_message(chat_id, text, parse_mode='HTML'):
+def send_message(chat_id, text):
     """Отправка сообщения"""
-    return call_telegram_api('sendMessage', {
+    return telegram_api('sendMessage', {
         'chat_id': chat_id,
         'text': text,
-        'parse_mode': parse_mode,
+        'parse_mode': 'HTML',
         'disable_web_page_preview': True
     })
 
-def send_video(chat_id, video_url, caption=''):
+def send_video(chat_id, video_url, caption=""):
     """Отправка видео"""
-    return call_telegram_api('sendVideo', {
+    return telegram_api('sendVideo', {
         'chat_id': chat_id,
         'video': video_url,
-        'caption': caption[:1024],
+        'caption': caption[:200],
         'supports_streaming': True
     })
 
-def send_photo(chat_id, photo_url, caption=''):
+def send_photo(chat_id, photo_url, caption=""):
     """Отправка фото"""
-    return call_telegram_api('sendPhoto', {
+    return telegram_api('sendPhoto', {
         'chat_id': chat_id,
         'photo': photo_url,
-        'caption': caption[:1024]
+        'caption': caption[:200]
     })
 
 # =========================================================================
@@ -202,8 +134,8 @@ def home():
     """Главная страница API"""
     return jsonify({
         'status': 'active',
-        'service': 'Telegram Downloader Bot',
-        'version': '3.0',
+        'bot': 'Telegram Downloader',
+        'bot_username': '@your_bot_username',  # Замените на username вашего бота
         'endpoints': {
             'GET /': 'Эта страница',
             'POST /': 'Telegram webhook',
@@ -212,55 +144,83 @@ def home():
     })
 
 @app.route('/health', methods=['GET'])
-def health_check():
-    """Проверка работоспособности"""
+def health():
+    """Проверка здоровья"""
     return jsonify({
-        'status': 'healthy',
-        'bot': 'ready' if BOT_TOKEN else 'no_token',
-        'environment': os.getenv('VERCEL_ENV', 'development')
+        'status': 'ok',
+        'bot_token_set': len(BOT_TOKEN) > 20,
+        'service': 'running'
     })
 
 # =========================================================================
-# ОБРАБОТЧИК WEBHOOK ОТ TELEGRAM
+# ОБРАБОТЧИК TELEGRAM WEBHOOK
 # =========================================================================
 
 @app.route('/', methods=['POST'])
-def handle_webhook():
-    """Основной обработчик вебхука"""
+def webhook():
+    """Обработчик вебхука от Telegram"""
     try:
-        update = request.json
+        data = request.json
         
-        if 'message' in update:
-            message = update['message']
+        if 'message' in data:
+            message = data['message']
             chat_id = message['chat']['id']
             text = message.get('text', '').strip()
             
-            logger.info(f"Message from {chat_id}: {text}")
+            logger.info(f"Message: {chat_id} - {text}")
             
             # Команда /start
             if text == '/start':
                 welcome = """
-<b>🤖 YouTube & Pinterest Downloader</b>
+<b>🎬 YouTube & Pinterest Downloader</b>
 
-Отправьте мне ссылку на:
-• YouTube (youtube.com, youtu.be)
-• Pinterest (pinterest.com)
+Привет! Я могу скачать для вас:
+• <b>Видео с YouTube</b> (до 5 минут)
+• <b>Изображения с Pinterest</b>
 
-Бот работает на Vercel Serverless
+Просто отправьте мне ссылку!
+
+Примеры:
+https://youtu.be/dQw4w9WgXcQ
+https://pinterest.com/pin/123456/
+
+<b>Бот работает на Vercel Serverless</b>
                 """
                 send_message(chat_id, welcome)
+                return jsonify({'status': 'ok'})
             
-            # YouTube ссылки
+            # YouTube
             elif 'youtube.com' in text or 'youtu.be' in text:
-                process_youtube(chat_id, text)
+                send_message(chat_id, "🎬 <b>YouTube ссылка получена!</b>\nОбрабатываю...")
+                
+                result = get_youtube_direct_link(text)
+                
+                if result['success']:
+                    send_message(chat_id, f"✅ <b>Найдено:</b> {result['title']}")
+                    
+                    # Пытаемся отправить видео
+                    video_resp = send_video(chat_id, result['url'], result['title'])
+                    
+                    if not video_resp.get('ok'):
+                        send_message(chat_id, f"📥 <b>Прямая ссылка:</b>\n<code>{result['url']}</code>")
+                else:
+                    send_message(chat_id, f"❌ <b>Ошибка:</b> {result['error']}")
             
-            # Pinterest ссылки
-            elif 'pinterest.com' in text:
-                process_pinterest(chat_id, text)
+            # Pinterest
+            elif 'pinterest.com' in text or 'pin.it' in text:
+                send_message(chat_id, "📌 <b>Pinterest ссылка получена!</b>\nИщу изображение...")
+                
+                result = get_pinterest_media(text)
+                
+                if result['success']:
+                    send_photo(chat_id, result['url'], result['title'])
+                    send_message(chat_id, "✅ <b>Изображение отправлено!</b>")
+                else:
+                    send_message(chat_id, f"❌ <b>Ошибка:</b> {result['error']}")
             
             # Любой другой текст
             elif text:
-                send_message(chat_id, f"📥 Отправьте ссылку на YouTube или Pinterest")
+                send_message(chat_id, "📥 Отправьте мне ссылку на YouTube или Pinterest")
         
         return jsonify({'status': 'ok'})
     
@@ -268,55 +228,6 @@ def handle_webhook():
         logger.error(f"Webhook error: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-def process_youtube(chat_id, url):
-    """Обработка YouTube"""
-    msg = send_message(chat_id, f"🎬 Обрабатываю YouTube ссылку...\n{url}")
-    
-    result = download_youtube_video(url)
-    
-    if result['success']:
-        edit_message(chat_id, msg['result']['message_id'], 
-                    f"✅ <b>Найдено:</b> {result['title']}\n"
-                    f"⏱️ Длительность: {result['duration']}с\n"
-                    f"📤 Отправляю...")
-        
-        # Пытаемся отправить видео
-        video_response = send_video(chat_id, result['url'], result['title'])
-        
-        if not video_response.get('ok'):
-            send_message(chat_id, 
-                        f"⚠️ <b>Ссылка для скачивания:</b>\n"
-                        f"<code>{result['url']}</code>")
-    else:
-        edit_message(chat_id, msg['result']['message_id'],
-                    f"❌ <b>Ошибка:</b> {result['error']}")
-
-def process_pinterest(chat_id, url):
-    """Обработка Pinterest"""
-    msg = send_message(chat_id, f"📌 Обрабатываю Pinterest...\n{url}")
-    
-    result = download_pinterest_media(url)
-    
-    if result['success']:
-        edit_message(chat_id, msg['result']['message_id'], "✅ Медиа найдено! Отправляю...")
-        
-        if result['type'] == 'image':
-            send_photo(chat_id, result['url'], result['title'])
-        else:
-            send_video(chat_id, result['url'], result['title'])
-    else:
-        edit_message(chat_id, msg['result']['message_id'],
-                    f"❌ <b>Ошибка:</b> {result['error']}")
-
-def edit_message(chat_id, message_id, text):
-    """Редактирование сообщения"""
-    return call_telegram_api('editMessageText', {
-        'chat_id': chat_id,
-        'message_id': message_id,
-        'text': text,
-        'parse_mode': 'HTML'
-    })
-
 # =========================================================================
-# ВАЖНО: НЕТ app.run()! Vercel сам запускает приложение
+# ВАЖНО: НИКАКОГО app.run()!
 # =========================================================================
